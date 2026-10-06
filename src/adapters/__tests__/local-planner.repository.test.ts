@@ -24,6 +24,30 @@ describe('LocalPlannerRepository', () => {
     expect(repo.load().value.suitcase.length).toBe(61);
   });
 
+  it('keeps both original and compressed dimensions in local snapshots', () => {
+    const repo = new LocalPlannerRepository(storage);
+    const sample = createSampleSnapshot();
+    const jacket = sample.items.find((item) => item.id === 'jacket')!;
+    repo.save(sample);
+    const restored = repo.load().value.items.find((item) => item.id === 'jacket')!;
+    expect(restored.height).toBe(jacket.height);
+    expect(restored.compressedHeight).toBe(jacket.compressedHeight);
+    expect(restored.compressionEnabled).toBe(true);
+  });
+
+  it('disables invalid compression rules when restoring a snapshot', () => {
+    const repo = new LocalPlannerRepository(storage);
+    const sample = createSampleSnapshot();
+    const snapshot = {
+      ...sample,
+      items: sample.items.map((item) => item.id === 'camera'
+        ? { ...item, compressionEnabled: true, compressedHeight: 2 }
+        : item),
+    };
+    repo.save(snapshot);
+    expect(repo.load().value.items.find((item) => item.id === 'camera')?.compressionEnabled).toBe(false);
+  });
+
   it('returns sample data when storage is empty', () => {
     const result = new LocalPlannerRepository(storage).load();
     expect(result.value.items.length).toBeGreaterThan(0);

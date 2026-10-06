@@ -37,4 +37,36 @@ describe('packItems', () => {
     expect(packItems(suitcase(), inputs, 'comfort')).toEqual(packItems(suitcase(), inputs, 'comfort'));
     expect(packItems(suitcase(), inputs, 'comfort').unplaced[0]?.reason).toContain('空间');
   });
+
+  it('packs compressed clothing with reduced height but unchanged weight and footprint', () => {
+    const compressed = item('shirt', {
+      category: '衣物',
+      length: 3,
+      width: 2,
+      height: 4,
+      compressedHeight: 1,
+      compressionEnabled: true,
+    });
+    const plan = packItems(suitcase({ height: 2 }), [compressed], 'comfort');
+    expect(plan.placements[0]?.dimensions.length).toBe(3);
+    expect(plan.placements[0]?.dimensions.width).toBe(2);
+    expect(plan.placements[0]?.dimensions.height).toBe(1);
+    expect(plan.totalWeight).toBe(1);
+    expect(plan.savedVolume).toBe(18);
+  });
+
+  it('does not use vertical footprint rotations for compressed clothing', () => {
+    const compressed = item('shirt', {
+      category: '衣物',
+      length: 9,
+      width: 2,
+      height: 4,
+      compressedHeight: 1,
+      compressionEnabled: true,
+    });
+    const plan = packItems(suitcase({ length: 8, width: 9, height: 4 }), [compressed], 'comfort');
+    expect(plan.placements[0]?.dimensions.length).toBe(2);
+    expect(plan.placements[0]?.dimensions.width).toBe(9);
+    expect(plan.placements[0]?.dimensions.height).toBe(1);
+  });
 });

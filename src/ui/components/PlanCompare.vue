@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { formatVolume } from '../../core/models';
 import type { PackingPlan, PlanMode, Suitcase } from '../../core/models';
 defineProps<{ plans: Record<PlanMode, PackingPlan>; selected: PlanMode; suitcase: Suitcase }>();
 const emit = defineEmits<{ select: [mode: PlanMode] }>();
@@ -10,6 +11,7 @@ const emit = defineEmits<{ select: [mode: PlanMode] }>();
       <span>{{ plan.id === 'minimal' ? 'LIGHT' : plan.id === 'comfort' ? 'BALANCED' : 'RESERVE' }}</span>
       <strong>{{ plan.name }}</strong>
       <small>{{ plan.placements.length }} 件 · {{ Math.round(plan.capacityRatio * 100) }}% 空间 · {{ plan.totalWeight.toFixed(1) }}/{{ suitcase.maxWeight }}kg</small>
+      <small v-if="plan.savedVolume > 0" class="saved-volume">压缩节省 {{ formatVolume(plan.savedVolume) }}</small>
     </button>
   </div>
 </template>

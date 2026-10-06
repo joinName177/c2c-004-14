@@ -1,4 +1,4 @@
-import type { Dimensions, PackingItem, Placement } from './models';
+import { isCompressionApplied, type Dimensions, type PackingItem, type Placement } from './models';
 
 export function rotationsOf(item: Pick<PackingItem, 'length' | 'width' | 'height'>): Dimensions[] {
   const [a, b, c] = [item.length, item.width, item.height];
@@ -8,6 +8,16 @@ export function rotationsOf(item: Pick<PackingItem, 'length' | 'width' | 'height
     { length: c, width: a, height: b }, { length: c, width: b, height: a },
   ];
   return candidates.filter((value, index) => candidates.findIndex((candidate) =>
+    candidate.length === value.length && candidate.width === value.width && candidate.height === value.height,
+  ) === index);
+}
+
+export function packingOrientations(item: PackingItem): Dimensions[] {
+  if (!isCompressionApplied(item)) return rotationsOf(item);
+  return [
+    { length: item.length, width: item.width, height: Number(item.compressedHeight) },
+    { length: item.width, width: item.length, height: Number(item.compressedHeight) },
+  ].filter((value, index, candidates) => candidates.findIndex((candidate) =>
     candidate.length === value.length && candidate.width === value.width && candidate.height === value.height,
   ) === index);
 }

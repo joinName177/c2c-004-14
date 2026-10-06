@@ -1,5 +1,5 @@
-import { intersects, rotationsOf } from './geometry';
-import { itemVolume, suitcaseVolume, type PackingItem, type PackingPlan, type Placement, type PlanMode, type Suitcase } from './models';
+import { intersects, packingOrientations } from './geometry';
+import { compressedVolumeSaving, effectiveItemDimensions, itemVolume, suitcaseVolume, type PackingItem, type PackingPlan, type Placement, type PlanMode, type Suitcase } from './models';
 
 const PLAN_NAMES: Record<PlanMode, string> = { minimal: '精简版', comfort: '舒适版', shopping: '购物版' };
 const RESERVE: Record<PlanMode, number> = { minimal: 0.8, comfort: 1, shopping: 0.65 };
@@ -19,7 +19,7 @@ function ordered(items: PackingItem[], mode: PlanMode): PackingItem[] {
     if (required) return required;
     const priority = b.priority - a.priority;
     if (priority) return priority;
-    return mode === 'shopping' ? a.weight - b.weight : itemVolume(b) - itemVolume(a) || a.id.localeCompare(b.id);
+    return mode === 'shopping' ? a.weight - b.weight : itemVolume(effectiveItemDimensions(b)) - itemVolume(effectiveItemDimensions(a)) || a.id.localeCompare(b.id);
   });
 }
 
@@ -42,28 +42,31 @@ export function packItems(suitcase: Suitcase, items: PackingItem[], mode: PlanMo
   const maxWeight = suitcase.maxWeight * RESERVE[mode];
   let totalWeight = 0;
   let usedVolume = 0;
+  let savedVolume = 0;
 
   for (const item of ordered(items, mode)) {
-    if ([item.length, item.width, item.height, item.weight].some((value) => !(value > 0))) {
+    const dimensions = effectiveItemDimensions(item);
+    if ([dimensions.length, dimensions.width, dimensions.height, item.weight].some((value) => !(value > 0))) {
       unplaced.push({ item, reason: '尺寸或重量无效' });
       continue;
     }
+    const requiredVolume = itemVolume(dimensions);
     if (totalWeight + item.weight > maxWeight) {
       unplaced.push({ item, reason: '超过当前方案承重预留' });
       continue;
     }
-    if (usedVolume + itemVolume(item) > capacity) {
+    if (usedVolume + requiredVolume > capacity) {
       unplaced.push({ item, reason: '超过当前方案空间预留' });
       continue;
     }
 
     let placement: Placement | undefined;
     for (const point of candidatePoints(placements)) {
-      for (const dimensions of rotationsOf(item)) {
-        const candidate: Placement = { itemId: item.id, ...point, dimensions };
-        const inBounds = candidate.x + dimensions.length <= suitcase.length
-          && candidate.y + dimensions.width <= suitcase.width
-          && candidate.z + dimensions.height <= suitcase.height;
+      for (const orientedDimensions of packingOrientations(item)) {
+        const candidate: Placement = { itemId: item.id, ...point, dimensions: orientedDimensions };
+        const inBounds = candidate.x + orientedDimensions.length <= suitcase.length
+          && candidate.y + orientedDimensions.width <= suitcase.width
+          && candidate.z + orientedDimensions.height <= suitcase.height;
         if (inBounds && placements.every((placed) => !intersects(candidate, placed))) {
           placement = candidate;
           break;
@@ -78,7 +81,8 @@ export function packItems(suitcase: Suitcase, items: PackingItem[], mode: PlanMo
     }
     placements.push(placement);
     totalWeight += item.weight;
-    usedVolume += itemVolume(item);
+    usedVolume += requiredVolume;
+    savedVolume += compressedVolumeSaving(item);
   }
 
   return {
@@ -88,6 +92,7 @@ export function packItems(suitcase: Suitcase, items: PackingItem[], mode: PlanMo
     unplaced,
     totalWeight,
     usedVolume,
+    savedVolume,
     capacityRatio: suitcaseVolume(suitcase) ? usedVolume / suitcaseVolume(suitcase) : 0,
   };
 }

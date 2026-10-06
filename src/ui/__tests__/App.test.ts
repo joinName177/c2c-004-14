@@ -55,4 +55,14 @@ describe('Luggage planner App', () => {
     await wrapper.get('[data-testid="print-button"]').trigger('click');
     expect(getPrintCount()).toBe(1);
   });
+
+  it('shows original and compressed dimensions for clothing and hides compression for digital items', () => {
+    const { wrapper } = render();
+    expect(wrapper.text()).toContain('原尺寸 30×24×5 cm');
+    expect(wrapper.text()).toContain('压缩后 30×24×3 cm');
+    const jacketRow = wrapper.findAll('.item-row').find((row) => row.text()?.includes('轻薄外套'))!;
+    expect(jacketRow.findAll('[aria-label="压缩后的高度"]')).toHaveLength(1);
+    const cameraRow = wrapper.findAll('.item-row').find((row) => row.text()?.includes('微单相机'))!;
+    expect(cameraRow.findAll('[aria-label="压缩后的高度"]')).toHaveLength(0);
+  });
 });

@@ -36,4 +36,52 @@ describe('usePlanner', () => {
     expect(planner.plans.value.shopping.name).toBe('购物版');
     expect(repository.saved?.selectedPlan).toBe('shopping');
   });
+
+  it('recalculates immediately while retaining the original height when compression is switched', () => {
+    const planner = usePlanner({ repository: new MemoryRepository(), printPort: { print() {} } });
+    const jacket = planner.state.items.find((item) => item.id === 'jacket')!;
+    expect(jacket.height).toBe(5);
+    expect(jacket.compressedHeight).toBe(3);
+    expect(planner.plans.value.comfort.savedVolume).toBeGreaterThan(0);
+
+    expect(planner.setCompression('jacket', false)).toBe(true);
+    const uncompressed = planner.state.items.find((item) => item.id === 'jacket')!;
+    expect(uncompressed.compressionEnabled).toBe(false);
+    expect(uncompressed.height).toBe(5);
+    expect(uncompressed.compressedHeight).toBe(3);
+    expect(planner.isStale.value).toBe(false);
+    expect(planner.plans.value.comfort.savedVolume).toBe(0);
+  });
+
+  it('keeps compression when changing to an ineligible category is cancelled', () => {
+    const planner = usePlanner({ repository: new MemoryRepository(), printPort: { print() {} } });
+    const outcome = planner.updateItem('jacket', { category: '数码' }, () => false);
+    const jacket = planner.state.items.find((item) => item.id === 'jacket')!;
+    expect(outcome).toBe(false);
+    expect(jacket.category).toBe('衣物');
+    expect(jacket.compressionEnabled).toBe(true);
+    expect(planner.isStale.value).toBe(false);
+  });
+
+  it('disables compression and recalculates after confirming an ineligible change', () => {
+    const planner = usePlanner({ repository: new MemoryRepository(), printPort: { print() {} } });
+    const outcome = planner.updateItem('jacket', { fragile: true }, () => true);
+    const jacket = planner.state.items.find((item) => item.id === 'jacket')!;
+    expect(outcome).toBe(true);
+    expect(jacket.fragile).toBe(true);
+    expect(jacket.compressionEnabled).toBe(false);
+    expect(planner.isStale.value).toBe(false);
+  });
+
+  it('refuses compression for digital items', () => {
+    const planner = usePlanner({ repository: new MemoryRepository(), printPort: { print() {} } });
+    expect(planner.setCompression('camera', true)).toBe(false);
+    expect(planner.state.items.find((item) => item.id === 'camera')?.compressionEnabled).not.toBe(true);
+  });
+
+  it('rejects compressed heights outside the original height', () => {
+    const planner = usePlanner({ repository: new MemoryRepository(), printPort: { print() {} } });
+    expect(planner.updateItem('jacket', { compressedHeight: 6 })).toBe(false);
+    expect(planner.state.items.find((item) => item.id === 'jacket')?.compressedHeight).toBe(3);
+  });
 });

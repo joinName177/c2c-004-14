@@ -24,6 +24,20 @@ describe('LocalPlannerRepository', () => {
     expect(repo.load().value.suitcase.length).toBe(61);
   });
 
+  it('keeps original and compressed dimensions through a save/load round trip', () => {
+    const repo = new LocalPlannerRepository(storage);
+    const sample = createSampleSnapshot();
+    const jacket = sample.items.find((item) => item.id === 'jacket');
+    if (!jacket) throw new Error('jacket missing');
+    jacket.compressedHeight = 3;
+    jacket.useCompression = true;
+    repo.save(sample);
+    const loaded = repo.load().value.items.find((item) => item.id === 'jacket');
+    expect(loaded?.height).toBe(5);
+    expect(loaded?.compressedHeight).toBe(3);
+    expect(loaded?.useCompression).toBe(true);
+  });
+
   it('returns sample data when storage is empty', () => {
     const result = new LocalPlannerRepository(storage).load();
     expect(result.value.items.length).toBeGreaterThan(0);

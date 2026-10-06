@@ -1,5 +1,5 @@
 import { rotationsOf } from './geometry';
-import type { PackingItem, PackingPlan, Risk, Suitcase } from './models';
+import { effectiveDimensions, type PackingItem, type PackingPlan, type Risk, type Suitcase } from './models';
 
 export function detectRisks(plan: PackingPlan, suitcase: Suitcase, items: PackingItem[]): Risk[] {
   const risks: Risk[] = [];
@@ -10,7 +10,7 @@ export function detectRisks(plan: PackingPlan, suitcase: Suitcase, items: Packin
   if (plan.capacityRatio > 0.9) risks.push({ id: 'high-volume', severity: 'warning', title: '空间接近满载', message: '空间利用率超过 90%，返程新增物品可能无法装入。' });
 
   for (const { item } of plan.unplaced) {
-    const oversized = rotationsOf(item).every((d) => d.length > suitcase.length || d.width > suitcase.width || d.height > suitcase.height);
+    const oversized = rotationsOf(effectiveDimensions(item)).every((d) => d.length > suitcase.length || d.width > suitcase.width || d.height > suitcase.height);
     if (oversized) risks.push({ id: `oversized-${item.id}`, severity: 'critical', title: `${item.name} 尺寸越界`, message: '任意旋转方向都无法放入当前行李箱。', itemId: item.id });
     if (item.mustHave) risks.push({ id: `missing-${item.id}`, severity: 'critical', title: `必需品未装入：${item.name}`, message: '请调整清单或改用更大行李箱。', itemId: item.id });
   }

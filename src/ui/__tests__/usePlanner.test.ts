@@ -36,4 +36,32 @@ describe('usePlanner', () => {
     expect(planner.plans.value.shopping.name).toBe('购物版');
     expect(repository.saved?.selectedPlan).toBe('shopping');
   });
+
+  it('applies compression and recalculates all plans immediately', () => {
+    const repository = new MemoryRepository();
+    const planner = usePlanner({ repository, printPort: { print() {} } });
+    planner.setCompression('jacket', { useCompression: true, compressedHeight: 3 });
+    const jacket = planner.state.items.find((item) => item.id === 'jacket');
+    expect(jacket?.height).toBe(5);
+    expect(jacket?.compressedHeight).toBe(3);
+    expect(jacket?.useCompression).toBe(true);
+    expect(planner.isStale.value).toBe(false);
+    expect(planner.plans.value.comfort.savedVolume).toBe(30 * 24 * (5 - 3));
+    expect(planner.plans.value.minimal.savedVolume).toBeGreaterThan(0);
+    expect(planner.plans.value.shopping.savedVolume).toBeGreaterThan(0);
+    expect(repository.saved?.items.find((item) => item.id === 'jacket')?.useCompression).toBe(true);
+  });
+
+  it('disables compression and recalculates when an item becomes fragile', () => {
+    const repository = new MemoryRepository();
+    const planner = usePlanner({ repository, printPort: { print() {} } });
+    planner.setCompression('jacket', { useCompression: true, compressedHeight: 3 });
+    planner.updateItemAndRecalculate('jacket', { fragile: true, useCompression: false });
+    const jacket = planner.state.items.find((item) => item.id === 'jacket');
+    expect(jacket?.fragile).toBe(true);
+    expect(jacket?.useCompression).toBe(false);
+    expect(jacket?.compressedHeight).toBe(3);
+    expect(planner.plans.value.comfort.savedVolume).toBe(0);
+    expect(planner.isStale.value).toBe(false);
+  });
 });

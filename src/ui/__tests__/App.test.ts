@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import App from '../App.vue';
 import { LocalPlannerRepository } from '../../adapters/local-planner.repository';
 
@@ -54,5 +54,52 @@ describe('Luggage planner App', () => {
     const { wrapper, getPrintCount } = render();
     await wrapper.get('[data-testid="print-button"]').trigger('click');
     expect(getPrintCount()).toBe(1);
+  });
+
+  it('compresses clothing and shows saved volume in plans, metrics and print sheet', async () => {
+    const { wrapper } = render();
+    await wrapper.get('[aria-label="压缩 轻薄外套"]').setValue(true);
+    await wrapper.get('[aria-label="轻薄外套 压缩后高度"]').setValue('3');
+    expect(wrapper.text()).toContain('本次采用高 3 cm · 节省 1.4 L');
+    expect(wrapper.text()).toContain('压缩节省');
+    expect(wrapper.text()).toContain('节省 1.4 L');
+    expect(wrapper.text()).toContain('原尺寸 30×24×5 cm · 本次采用 30×24×3 cm');
+    expect(wrapper.text()).toContain('本次压缩节省体积 1.4 L');
+  });
+
+  it('rejects a compressed height outside the original height', async () => {
+    const { wrapper } = render();
+    await wrapper.get('[aria-label="压缩 轻薄外套"]').setValue(true);
+    const heightInput = wrapper.get('[aria-label="轻薄外套 压缩后高度"]');
+    await heightInput.setValue('0');
+    expect(wrapper.text()).toContain('压缩高度必须大于 0');
+    await heightInput.setValue('9');
+    expect(wrapper.text()).toContain('压缩高度不能超过原高度');
+    expect(wrapper.text()).not.toContain('本次采用高 9 cm');
+  });
+
+  it('asks before disabling compression when the category no longer allows it', async () => {
+    const { wrapper } = render();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    await wrapper.get('[aria-label="压缩 轻薄外套"]').setValue(true);
+    const select = wrapper.get('[aria-label="修改 轻薄外套 类别"]');
+    await select.setValue('数码');
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(wrapper.find('[aria-label="压缩 轻薄外套"]').exists()).toBe(true);
+    confirmSpy.mockReturnValue(true);
+    await select.setValue('数码');
+    expect(wrapper.find('[aria-label="压缩 轻薄外套"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('已停用压缩并重新计算三套方案');
+    confirmSpy.mockRestore();
+  });
+
+  it('asks before disabling compression when the item is marked fragile', async () => {
+    const { wrapper } = render();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await wrapper.get('[aria-label="压缩 轻薄外套"]').setValue(true);
+    await wrapper.get('[aria-label="标记 轻薄外套 易碎"]').setValue(true);
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(wrapper.find('[aria-label="压缩 轻薄外套"]').exists()).toBe(false);
+    confirmSpy.mockRestore();
   });
 });

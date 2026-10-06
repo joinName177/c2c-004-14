@@ -4,7 +4,7 @@ import type { PackingItem, PackingPlan, Suitcase } from '../models';
 
 const suitcase: Suitcase = { length: 10, width: 8, height: 6, maxWeight: 10 };
 const item = (id: string, overrides: Partial<PackingItem> = {}): PackingItem => ({ id, name: id, category: '其他', length: 2, width: 2, height: 2, weight: 1, priority: 2, mustHave: false, ...overrides });
-const basePlan = (): PackingPlan => ({ id: 'comfort', name: '舒适版', placements: [], unplaced: [], totalWeight: 0, usedVolume: 0, capacityRatio: 0 });
+const basePlan = (): PackingPlan => ({ id: 'comfort', name: '舒适版', placements: [], unplaced: [], totalWeight: 0, usedVolume: 0, savedVolume: 0, capacityRatio: 0 });
 
 describe('detectRisks', () => {
   it('reports overweight and high volume', () => {
@@ -16,6 +16,15 @@ describe('detectRisks', () => {
     const huge = item('huge', { length: 11 });
     const plan = { ...basePlan(), unplaced: [{ item: huge, reason: '没有可用的连续空间' }] };
     expect(detectRisks(plan, suitcase, [huge]).some((risk) => risk.id === 'oversized-huge')).toBe(true);
+  });
+
+  it('checks oversized against the compressed height when compression is active', () => {
+    const coat = item('coat', { category: '衣物', length: 2, width: 2, height: 11, compressedHeight: 5, useCompression: true });
+    const compressedPlan = { ...basePlan(), unplaced: [{ item: coat, reason: '没有可用的连续空间' }] };
+    expect(detectRisks(compressedPlan, suitcase, [coat]).some((risk) => risk.id === 'oversized-coat')).toBe(false);
+    const raw = item('raw', { category: '衣物', length: 2, width: 2, height: 11 });
+    const rawPlan = { ...basePlan(), unplaced: [{ item: raw, reason: '没有可用的连续空间' }] };
+    expect(detectRisks(rawPlan, suitcase, [raw]).some((risk) => risk.id === 'oversized-raw')).toBe(true);
   });
 
   it('reports fragile items with a box stacked above', () => {

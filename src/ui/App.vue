@@ -3,9 +3,11 @@ import { computed, ref } from 'vue';
 import { LocalPlannerRepository } from '../adapters/local-planner.repository';
 import { BrowserPrintAdapter } from '../adapters/browser-print.adapter';
 import { validateSuitcase } from '../core/packing-engine';
+import type { PackingItem } from '../core/models';
 import type { PlannerRepository } from '../ports/planner-repository.port';
 import type { PrintPort } from '../ports/print.port';
 import { usePlanner } from './usePlanner';
+import { formatVolume } from './format';
 import SuitcaseForm from './components/SuitcaseForm.vue';
 import ItemEditor from './components/ItemEditor.vue';
 import ItemList from './components/ItemList.vue';
@@ -18,6 +20,11 @@ const props = defineProps<{ repository?: PlannerRepository; printPort?: PrintPor
 const planner = usePlanner({ repository: props.repository ?? new LocalPlannerRepository(window.localStorage), printPort: props.printPort ?? new BrowserPrintAdapter() });
 const selectedItem = ref('');
 const errors = computed(() => validateSuitcase(planner.state.suitcase));
+
+function onItemUpdate(id: string, patch: Partial<PackingItem>, recalculate: boolean) {
+  if (recalculate) planner.updateItemAndRecalculate(id, patch, '已停用压缩并重新计算三套方案');
+  else planner.updateItem(id, patch);
+}
 </script>
 
 <template>
@@ -29,10 +36,10 @@ const errors = computed(() => validateSuitcase(planner.state.suitcase));
       <div class="workspace">
         <aside class="left-column">
           <SuitcaseForm :suitcase="planner.state.suitcase" :errors="errors" @update="planner.updateSuitcase" />
-          <section class="panel inventory"><div class="section-title"><div><span>02 / INVENTORY</span><h2>待装物品</h2></div><b>{{ planner.state.items.length }} 件</b></div><ItemEditor @add="planner.addItem" /><ItemList :items="planner.state.items" @remove="planner.removeItem" @toggle="(id, mustHave) => planner.updateItem(id, { mustHave })" /></section>
+          <section class="panel inventory"><div class="section-title"><div><span>02 / INVENTORY</span><h2>待装物品</h2></div><b>{{ planner.state.items.length }} 件</b></div><ItemEditor @add="planner.addItem" /><ItemList :items="planner.state.items" @remove="planner.removeItem" @toggle="(id, mustHave) => planner.updateItem(id, { mustHave })" @update="onItemUpdate" @compression="(id, patch) => planner.setCompression(id, patch)" /></section>
         </aside>
         <section class="right-column">
-          <div class="canvas-panel"><div class="canvas-head"><div><span>03 / PACKING MAP</span><h2>{{ planner.currentPlan.value.name }}摆放方案</h2></div><div class="metrics"><span><b>{{ Math.round(planner.currentPlan.value.capacityRatio * 100) }}%</b>空间利用</span><span><b>{{ planner.currentPlan.value.totalWeight.toFixed(1) }}</b>kg 已装</span><span><b>{{ planner.currentPlan.value.unplaced.length }}</b>件未装</span></div></div><div class="projections"><PackingProjection view="top" :plan="planner.currentPlan.value" :suitcase="planner.state.suitcase" :items="planner.state.items" :selected-id="selectedItem" @select="selectedItem = $event" /><PackingProjection view="side" :plan="planner.currentPlan.value" :suitcase="planner.state.suitcase" :items="planner.state.items" :selected-id="selectedItem" @select="selectedItem = $event" /></div><p class="canvas-note">点击色块可在两个视图中同步定位物品。摆放坐标以箱体左下后角为原点。</p></div>
+          <div class="canvas-panel"><div class="canvas-head"><div><span>03 / PACKING MAP</span><h2>{{ planner.currentPlan.value.name }}摆放方案</h2></div><div class="metrics"><span><b>{{ Math.round(planner.currentPlan.value.capacityRatio * 100) }}%</b>空间利用</span><span><b>{{ planner.currentPlan.value.totalWeight.toFixed(1) }}</b>kg 已装</span><span v-if="planner.currentPlan.value.savedVolume > 0"><b>{{ formatVolume(planner.currentPlan.value.savedVolume) }}</b>压缩节省</span><span><b>{{ planner.currentPlan.value.unplaced.length }}</b>件未装</span></div></div><div class="projections"><PackingProjection view="top" :plan="planner.currentPlan.value" :suitcase="planner.state.suitcase" :items="planner.state.items" :selected-id="selectedItem" @select="selectedItem = $event" /><PackingProjection view="side" :plan="planner.currentPlan.value" :suitcase="planner.state.suitcase" :items="planner.state.items" :selected-id="selectedItem" @select="selectedItem = $event" /></div><p class="canvas-note">点击色块可在两个视图中同步定位物品。摆放坐标以箱体左下后角为原点。</p></div>
           <RiskPanel :risks="planner.risks.value" />
         </section>
       </div>
